@@ -1,5 +1,5 @@
 import { html, render } from 'lit-html';
-import { 1mpx_backend } from 'declarations/1mpx_backend';
+import { px1m_backend } from 'declarations/px1m_backend';
 import logo from './logo2.svg';
 
 class App {
@@ -12,7 +12,7 @@ class App {
   #handleSubmit = async (e) => {
     e.preventDefault();
     const name = document.getElementById('name').value;
-    this.greeting = await 1mpx_backend.greet(name);
+    this.greeting = await px1m_backend.greet(name);
     this.#render();
   };
 

@@ -23,16 +23,17 @@ import Time64 "../util/motoko/Time64";
 import Iter "mo:base/Iter";
 import Option "mo:base/Option";
 import VarArray "mo:core/VarArray";
+import Array "mo:core/Array";
 import ICRC1L "../icrc1_canister/ICRC1";
 import ICRC1T "../icrc1_canister/Types";
 import ICRC1 "../icrc1_canister/main";
 import Linker1 "linker1";
 
 shared (install) persistent actor class Canister(
-  // deploy : {
-  //   #Init : T.Environment;
-  //   #Upgrade;
-  // }
+  deploy : {
+    #Init : T.Environment;
+    #Upgrade;
+  }
 ) = Self {
   var tip_cert = MerkleTree.empty();
   func updateTipCert() = CertifiedData.set(MerkleTree.treeHash(tip_cert));
@@ -45,7 +46,6 @@ shared (install) persistent actor class Canister(
     duration = {
       tx_window = Time64.HOURS(24);
       permitted_drift = Time64.SECONDS(60);
-      credit_expiry = Time64.DAYS(30); // todo: maybe remove this since user already paid for the credits
     };
     fee_collector = install.caller;
     linker = "";
@@ -73,10 +73,14 @@ shared (install) persistent actor class Canister(
       min_tcycles = 4;
     };
   };
+  switch deploy {
+    case (#Init i) updateTipCert(env := i);
+    case _ ();
+  };
 
   var users = RBTree.empty<Principal, T.User>();
   // var expiries = RBTree.empty<Nat64, T.EUser>();
-  let canvas : T.Ys = VarArray.tabulate<T.Xs>(env.canvas.h, func(_) : T.Xs = VarArray.tabulate<T.Pixel>(env.canvas.w, func(_) : T.Pixel = { var color = 0 }));
+  let canvas : T.Ys = Array.tabulate<T.Xs>(env.canvas.h, func(_) : T.Xs = VarArray.tabulate<Nat8>(env.canvas.w, func(_) : Nat8 = 0));
 
   var commit_dedupes = RBTree.empty<(Principal, T.CommitArg), Nat>();
   var topup_dedupes = RBTree.empty<(Principal, T.TopupArg), Nat>();
@@ -246,6 +250,8 @@ shared (install) persistent actor class Canister(
     credit := L.useCredit(credit);
     user := L.saveCredit(user, sub, credit);
     saveUser(caller, user, ());
+
+    canvas[arg.pixel.y][arg.pixel.x] := arg.pixel.color;
 
     let (block_id, phash) = ArchiveL.getPhash(blocks);
     if (arg.created_at != null) commit_dedupes := RBTree.insert(commit_dedupes, L.dedupeCommit, (caller, arg), block_id);

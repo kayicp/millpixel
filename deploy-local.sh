@@ -1,45 +1,55 @@
 clear
 # mops test
 
-dfx stop
-rm -rf .dfx
-dfx start --clean --background
+# dfx stop
+# rm -rf .dfx
+# dfx start --clean --background
 
 echo "$(dfx identity use default)"
 export DEFAULT_ACCOUNT_ID=$(dfx ledger account-id)
 echo "DEFAULT_ACCOUNT_ID: " $DEFAULT_ACCOUNT_ID
 export DEFAULT_PRINCIPAL=$(dfx identity get-principal)
 
-export INTERNET_ID="rdmx6-jaaaa-aaaaa-aaadq-cai"
-export ICP_ID="ryjl3-tyaaa-aaaaa-aaaba-cai"
-export TCYCLES_ID="um5iw-rqaaa-aaaaq-qaaba-cai"
 
-dfx deploy internet_identity --no-wallet --specified-id $INTERNET_ID
+# export INTERNET_ID="rdmx6-jaaaa-aaaaa-aaadq-cai"
+# export ICP_ID="ryjl3-tyaaa-aaaaa-aaaba-cai"
+# export TCYCLES_ID="um5iw-rqaaa-aaaaq-qaaba-cai"
+export LINKER_ID="gvqys-hyaaa-aaaar-qagfa-cai" #ICP
+export PX1M_ID="sv3dd-oaaaa-aaaar-qacoa-cai"
+export FEE_COLLECTOR="ckv5t-bbcan-nljbc-sbcxx-meohl-h33o2-tbyhz-4rzvb-ezsww-t3pyo-xqe"
 
-dfx deploy icp_token --no-wallet --specified-id $ICP_ID --argument "(
+# dfx deploy internet_identity --no-wallet --specified-id $INTERNET_ID
+
+dfx deploy px1m_backend --no-wallet --specified-id $PX1M_ID --argument "(
   variant {
     Init = record {
-      token = record {
-        fee = 10_000 : nat;
-        decimals = 8 : nat;
-        name = \"Internet Computer\";
-        minter = principal \"$DEFAULT_PRINCIPAL\";
-        permitted_drift_secs = 60 : nat;
-        tx_window_secs = 3_600 : nat;
-        max_supply = 100_000_000_000_000_000 : nat;
-        max_memo_size = 32 : nat;
-        min_memo_size = 1 : nat;
-        symbol = \"ICP\";
-        max_approval_expiry_secs = 2_592_000 : nat;
+			available = true;
+			memo_size = record { min = 1; max = 32 };
+      canvas = record { h = 1000; w = 1000 };
+			duration = record {
+				tx_window = 86_400_000_000_000;
+				permitted_drift = 60_000_000_000;
+			};
+			fee_collector = principal \"$FEE_COLLECTOR\";
+			linker = \"$LINKER_ID\";
+      plans = vec {
+        record { credits = 100; multiplier = 3 };
+        record { credits = 1_000; multiplier = 2 };
+        record { credits = 5_000; multiplier = 1 };
       };
-			vault = null;
-      archive = record {
-        min_creation_tcycles = 4 : nat;
-        max_update_batch = 10 : nat;
-      }
-    }
-  }
+			max_update_batch_size = 10;
+      max_query_batch_size = 100;
+      max_take_value = 100;
+			archive = record {
+				max_update_batch_size = 10;
+				root = null;
+				standby = null;
+				min_tcycles = 4;
+			}
+		}
+	}
 )"
 
-dfx deploy frontend --no-wallet
+# dfx deploy px1m_frontend --no-wallet
+
 

@@ -1,10 +1,10 @@
 {
-  "name": "1mpx_frontend",
+  "name": "px1m_frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "setup": "npm i && dfx canister create 1mpx_backend && dfx generate 1mpx_backend && dfx deploy",
+    "setup": "npm i && dfx canister create px1m_backend && dfx generate px1m_backend && dfx deploy",
     "start": "vite --port 3000",
     "prebuild": "dfx generate",
     "build": "tsc && vite build",

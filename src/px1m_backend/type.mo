@@ -10,7 +10,6 @@ module {
     duration : {
       tx_window : Nat64;
       permitted_drift : Nat64;
-      credit_expiry : Nat64;
     };
     canvas : { h : Nat; w : Nat };
     fee_collector : Principal;
@@ -28,9 +27,8 @@ module {
   };
   public type User = RBTree.Type<(subaccount : Blob), Nat>;
 
-  public type Pixel = { var color : Nat8 }; // 256 colors
-  public type Xs = [var Pixel];
-  public type Ys = [var Xs];
+  public type Xs = [var Nat8]; // 256 colors
+  public type Ys = [Xs];
 
   public type ArgType = {
     #Commit : CommitArg;
@@ -40,6 +38,7 @@ module {
   public type CommitArg = {
     subaccount : ?Blob;
     pixel : { x : Nat; y : Nat; color : Nat8 };
+
     memo : ?Blob;
     created_at : ?Nat64;
   };
@@ -55,6 +54,7 @@ module {
   public type TopupArg = {
     subaccount : ?Blob;
     plan : Nat;
+
     fee : ?Nat;
     memo : ?Blob;
     created_at : ?Nat64;
