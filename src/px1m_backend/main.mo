@@ -17,6 +17,7 @@ import Buffer "mo:base/Buffer";
 import Nat64 "mo:base/Nat64";
 import Error "../util/motoko/Error";
 import ICRC3T "../util/motoko/ICRC-3/Types";
+import ICRC3L "../util/motoko/ICRC-3";
 import Subaccount "../util/motoko/Subaccount";
 import Cycles "mo:core/Cycles";
 import Time64 "../util/motoko/Time64";
@@ -78,15 +79,15 @@ shared (install) persistent actor class Canister(
     case _ ();
   };
 
-  public shared query func icrc3_get_blocks(args : [ICRC3T.GetBlocksArg]) : async ICRC3T.GetBlocksResult {
-    {
-      log_length = 0;
-      blocks = [];
-      archived_blocks = [];
-    };
-  };
+  public shared query func icrc3_get_blocks(args : [ICRC3T.GetBlocksArg]) : async ICRC3T.GetBlocksResult = async ICRC3L.getBlocks(args, blocks, env.archive.root);
   public shared query func canvas_pixels_of(coords : [{ x : Nat; y : Nat }]) : async [Nat8] {
-    [];
+    let max_take = Nat.min(coords.size(), env.max_query_batch_size);
+    let buff = Buffer.Buffer<Nat8>(max_take);
+    label finding for (coord in coords.vals()) {
+      buff.add(canvas[coord.y * env.canvas.w + coord.x]);
+      if (buff.size() >= max_take) break finding;
+    };
+    Buffer.toArray(buff);
   };
   public shared query func canvas_credits_of(args : [ICRC1T.Account]) : async [Nat] {
     let max_take = Nat.min(args.size(), env.max_query_batch_size);
@@ -107,7 +108,7 @@ shared (install) persistent actor class Canister(
 
   var users = RBTree.empty<Principal, T.User>();
   // var expiries = RBTree.empty<Nat64, T.EUser>();
-  let canvas : T.Ys = Array.tabulate<T.Xs>(env.canvas.h, func(_) : T.Xs = VarArray.tabulate<Nat8>(env.canvas.w, func(_) : Nat8 = 0));
+  let canvas = VarArray.tabulate<Nat8>(env.canvas.h * env.canvas.w, func(_) : Nat8 = 0);
 
   var commit_dedupes = RBTree.empty<(Principal, T.CommitArg), Nat>();
   var topup_dedupes = RBTree.empty<(Principal, T.TopupArg), Nat>();
@@ -278,7 +279,7 @@ shared (install) persistent actor class Canister(
     user := L.saveCredit(user, sub, credit);
     saveUser(caller, user, ());
 
-    canvas[arg.y][arg.x] := arg.color;
+    canvas[arg.y * env.canvas.w + arg.x] := arg.color;
 
     let (block_id, phash) = ArchiveL.getPhash(blocks);
     if (arg.created_at != null) commit_dedupes := RBTree.insert(commit_dedupes, L.dedupeCommit, (caller, arg), block_id);

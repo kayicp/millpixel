@@ -1,5 +1,6 @@
 import { html } from 'lit-html';
 
+// todo: rewrite UI copy: use topup credit or topup pixels?
 export default class Topup {
 	static PATH = '/topup';
 	constructor(backend) {
@@ -53,7 +54,7 @@ export default class Topup {
 						<div class="text-xs text-slate-400">available credits</div>
 					` : html`
 						<div class="text-sm font-medium text-slate-200">Anonymous</div>
-						<div class="text-xs text-slate-400">Sign in to see your credits and purchase</div>
+						<div class="text-xs text-slate-400">Sign in to see your credits</div>
 					`}
 				</div>
 			</div>
@@ -70,11 +71,12 @@ export default class Topup {
 							<div class="text-right">
 								<div class="text-xl font-bold">${token.clean(p.price)} ${token.symbol}</div>
 							</div>
-						</div>
-
+						</div>          
 						<hr class="my-3 border-slate-700" />
-
 						<!-- Buy button (disabled if not logged in) -->
+						<ul class="text-sm space-y-2 mb-4">
+							<li class="text-emerald-400">${p.savings_pct > 0? `You save ~${p.savings_pct}% vs Starter` : html`&nbsp;`}</li>
+						</ul>
 						<button
 							class="w-full inline-flex justify-center items-center gap-2 px-4 py-2 rounded-lg font-semibold transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 ${idx === 0 ? 'focus:ring-violet-400' : idx === 1 ? 'focus:ring-amber-400' : 'focus:ring-emerald-400'} ${isLoggedIn ? `${idx === 0 ? 'bg-violet-500' : idx === 1 ? 'bg-amber-500' : 'bg-emerald-500'} ${idx === 0 ? 'hover:bg-violet-600' : idx === 1 ? 'hover:bg-amber-600' : 'hover:bg-emerald-600'} text-slate-900` : 'bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed pointer-events-none'}"
 							?disabled=${!isLoggedIn}
@@ -85,9 +87,7 @@ export default class Topup {
 						>
 							${isLoggedIn ? html`Buy ${p.credits} credits — ${token.clean(p.price)} ${token.symbol}` : html`Log in to buy`}
 						</button>
-						<ul class="text-sm space-y-2 mb-4">
-							${p.savings_pct > 0 ? html`<li class="text-emerald-400">You save ~${p.savings_pct}% vs Starter</li>` : ''}
-						</ul>
+						
 					</section>
 				`)}
 			</div>
