@@ -23,20 +23,18 @@ export default class Linker {
 	async get() {
 		this.get_busy = true;
 		this.render();
-		await this.#get();
-		this.get_busy = false;
-		this.render();
-	}
-
-	async #get() {
 		try {
 			if (this.anon == null) this.anon = await genActor(idlFactory, this.id);
 			if (this.token == null) {
 				const token_p = await this.anon.icrc1pv_token();
 				this.token = new Token(token_p, this.wallet);
 			}
+			this.get_busy = false;
+			this.render();
 		} catch (cause) {
+			this.get_busy = false;
 			this.notif.errorToast(`Linker ${shortPrincipal(this.id_p)} Meta Failed`, cause);
 		}
+		this.token.get();
 	}
 }

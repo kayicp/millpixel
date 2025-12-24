@@ -12,7 +12,7 @@ export DEFAULT_PRINCIPAL=$(dfx identity get-principal)
 
 export LINKER_ID="gvqys-hyaaa-aaaar-qagfa-cai" #ICP
 export PX1M_ID="sv3dd-oaaaa-aaaar-qacoa-cai"
-export FEE_COLLECTOR="pkbbk-bbiei-xa3ua-yqgdn-ntzs4-yyphq-ubpzr-vep2j-54gop-gvgzw-bqe"
+export FEE_COLLECTOR="jb3rm-dqvvx-w657u-gzxcr-77l4a-safvl-b4rzc-s2qi7-mpuob-nh7qu-tae"
 
 
 dfx deploy px1m_backend --no-wallet --specified-id $PX1M_ID --argument "(

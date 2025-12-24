@@ -22,12 +22,6 @@ export default class Token {
 	async get() {
 		this.get_busy = true;
 		this.render();
-		await this.#get();
-		this.get_busy = false;
-		this.render();
-	}
-
-	async #get() {
 		try {
 			if (this.anon == null) this.anon = await genActor(idlFactory, this.id);
 			if (this.power == null) {
@@ -43,6 +37,7 @@ export default class Token {
 				this.decimals = Number(decimals);
 				this.power = BigInt(10 ** this.decimals);
 			}
+			this.get_busy = false;
 			this.render();
 		} catch (cause) {
 			this.get_busy = false;

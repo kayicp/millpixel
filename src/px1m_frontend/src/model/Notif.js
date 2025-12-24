@@ -117,7 +117,13 @@ export default class Notif {
 								<div class="mt-3 flex gap-2 justify-end">
 									${this.popup.actions.map(a => html`
 										<button
-											class="px-3 py-1 text-xs rounded-md bg-slate-700 hover:bg-slate-600 text-slate-100"
+											class="px-3 py-1 text-xs rounded-md 
+											${this.popup.type == 'success'
+												? 'bg-green-700 hover:bg-green-600'
+												: this.popup.type == 'error'
+													? 'bg-red-700 hover:bg-red-600'
+													: 'bg-blue-700 hover:bg-blue-600'}
+											text-slate-100"
 											@click=${() => { 
 												try {
 													a.onClick && a.onClick(); 

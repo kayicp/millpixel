@@ -6,11 +6,17 @@ import { idlFactory, canisterId } from 'declarations/px1m_backend';
 import Linker from './Linker';
 import { convertTyped } from '../../../util/js/value';
 
+const network = process.env.DFX_NETWORK;
+const account_link_origin =
+  network === 'ic'
+		? 'https://id.ai/' // Mainnet
+    : 'http://xob7s-iqaaa-aaaar-qacra-cai.localhost:8080'; // Local
+
 export default class Canvas {
 	busy = false;
 	get_busy = false;
 	buffer = new Uint8Array();
-	to_commit = new Map();
+	placedPixels = new Map();
 	credits = 0n;
 	bufferVersion = 0;
 
@@ -30,71 +36,74 @@ export default class Canvas {
 	async get() {
 		this.get_busy = true;
 		this.render();
-		await this.#get();
-		this.get_busy = false;
-		this.render();
-	}
-
-	async #get() {
 		try {
 			if (this.anon == null) this.anon = await genActor(idlFactory, canisterId);
-			const [width, height, credit_plans, linker] = await Promise.all([
-				this.anon.canvas_width(),
-				this.anon.canvas_height(),
-				this.anon.canvas_credit_plans(),
-				this.anon.canvas_linker(),
-			]);
-			this.width = Number(width);
-			this.height = Number(height);
-			this.plans = credit_plans;
-			this.linker = new Linker(linker, this.wallet);
-			this.buffer = new Uint8Array(this.width * this.height);
+			if (this.width == null) {
+				const [width, height, credit_plans, linker] = await Promise.all([
+					this.anon.canvas_width(),
+					this.anon.canvas_height(),
+					this.anon.canvas_credit_plans(),
+					this.anon.canvas_linker(),
+				]);
+				this.width = Number(width);
+				this.height = Number(height);
+				this.plans = credit_plans;
+				this.linker = new Linker(linker, this.wallet);
+				this.buffer = new Uint8Array(this.width * this.height);
+				this.render();
+			}
 		} catch (cause) {
-			console.error(cause);
+			this.get_busy = false;
 			return this.notif.errorToast(`Canvas Meta Failed`, cause);
 		}
+		this.linker.get();
 		if (this.wallet.principal != null) {
 			try {
 				const user_acct = { owner: this.wallet.principal, subaccount: [] };
 				const [user_credit] = await this.anon.canvas_credits_of([user_acct]);
 				this.credits = user_credit;
+				this.render();
 			} catch (cause) {
+				this.get_busy = false;
 				return this.notif.errorToast(`Canvas Credit Failed`, cause);
 			}
 		}
 
 		// if (this.has_init) {
-			try {
-				const PARALLEL = 5;
-				const TOTAL = this.width * this.height;
-				
-				// Build request list
-				const requests = [];
-				for (let offset = 0; offset < TOTAL; offset += Canvas.MAX_TAKE) {
-					requests.push({
-						x: offset % this.width,
-						y: Math.floor(offset / this.width),
-						take: Math.min(Canvas.MAX_TAKE, TOTAL - offset),
-						offset
-					});
-				}
-				
-				// Process in parallel batches
-				for (let i = 0; i < requests.length; i += PARALLEL) {
-					const chunk = requests.slice(i, i + PARALLEL);
-					const results = await Promise.all(
-						chunk.map(r => this.anon.canvas_pixels_from(BigInt(r.x), BigInt(r.y), [BigInt(r.take)]))
-					);
-					// Copy directly into buffer
-					results.forEach((pixels, idx) => {
-						this.buffer.set(pixels, chunk[idx].offset);
-					});
-				}
-				this.bufferVersion++;
-				// this.has_init = false;
-			} catch (cause) {
-				this.notif.errorToast(`Canvas Pixels Init Failed`, cause);
+		try {
+			const PARALLEL = 5;
+			const TOTAL = this.width * this.height;
+			
+			// Build request list
+			const requests = [];
+			for (let offset = 0; offset < TOTAL; offset += Canvas.MAX_TAKE) {
+				requests.push({
+					x: offset % this.width,
+					y: Math.floor(offset / this.width),
+					take: Math.min(Canvas.MAX_TAKE, TOTAL - offset),
+					offset
+				});
 			}
+			
+			// Process in parallel batches
+			for (let i = 0; i < requests.length; i += PARALLEL) {
+				const chunk = requests.slice(i, i + PARALLEL);
+				const results = await Promise.all(
+					chunk.map(r => this.anon.canvas_pixels_from(BigInt(r.x), BigInt(r.y), [BigInt(r.take)]))
+				);
+				// Copy directly into buffer
+				results.forEach((pixels, idx) => {
+					this.buffer.set(pixels, chunk[idx].offset);
+				});
+			}
+			this.bufferVersion++;
+			// this.has_init = false;
+			this.get_busy = false;
+			this.render();
+		} catch (cause) {
+			this.get_busy = false;
+			this.notif.errorToast(`Canvas Pixels Init Failed`, cause);
+		}
 		// }
 
 		// if (this.init_full < this.buffer.length) this.curr_len = null;
@@ -148,7 +157,7 @@ export default class Canvas {
 		// 		}
 		// 	}
 		// }
-		this.notif.successToast('Ready', '');
+		console.log('Ready');
 	}
 
 	async topup(idx, price, credits) {
@@ -158,7 +167,7 @@ export default class Canvas {
 		this.notif.confirmPopup(
 			`Confirm top‑up`,
 			html`
-				<div class="text-xs space-y-4">
+				<div class="text-xs space-y-6">
 					<!-- Payment details -->
 					<section>
 						<div class="uppercase tracking-wide text-slate-400 mb-1">
@@ -190,54 +199,83 @@ export default class Canvas {
 						</div>
 					</section>
 					<br>
-	
 					<hr class="border-slate-700" />
 					<br>
-	
-					<!-- AccountLink setup instructions -->
-					<section>
-						<div class="uppercase tracking-wide text-slate-400 mb-1">
-							Set up in AccountLink
+					<!-- AccountLink setup (new flow) -->
+					<section class="space-y-3">
+						<div class="uppercase tracking-wide text-slate-400">
+							Finish in AccountLink
 						</div>
-						<p class="mb-2 text-slate-400">
-							In AccountLink, create or update the link for <span class="font-semibold">MillionPixels</span>
-							to your vault by using these values:
+						<br>
+						<p class="text-slate-400">
+							We’ll open AccountLink with this payment already configured for
+							<span class="font-semibold">MillionPixels</span>. Review and approve
+							the link there, then return here to confirm the payment.
 						</p>
-	
-						<div class="space-y-2">
-							<div>
-								<div class="text-slate-400">App canister ID (backend principal)</div>
-								<div class="text-slate-200 font-mono break-all">
-									${canisterId}
+						<br>
+						<button
+							@click=${() => {
+								const url = `${account_link_origin}/links/new?${new URLSearchParams({
+									linker: this.linker.id,
+									app: canisterId,
+									user: this.wallet.principal,
+									spending_limit: token.clean(total),
+									expiry_unit: "days",
+									expiry_amount: 1,
+								}).toString()}`;
+								window.open(url, '_blank');
+							}}
+							class="px-3 py-1 text-xs rounded-md bg-blue-700 hover:bg-blue-600 text-slate-100"
+						>
+							Open AccountLink in new tab
+						</button>
+		
+						<!-- Optional: advanced details for verification -->
+						<details class="mt-2">
+							<summary class="cursor-pointer text-slate-500 hover:text-slate-300 text-[11px]">
+								Show technical details
+							</summary>
+							<div class="mt-2 space-y-3">
+								<div>
+									<div class="text-slate-400 text-[11px]">
+										App canister ID (backend principal)
+									</div>
+									<div class="text-slate-200 font-mono break-all text-[11px]">
+										${canisterId}
+									</div>
+								</div>
+		
+								<div>
+									<div class="text-slate-400 text-[11px]">
+										Your user ID (principal)
+									</div>
+									<div class="text-slate-200 font-mono break-all text-[11px]">
+										${this.wallet.principal}
+									</div>
+								</div>
+		
+								<div>
+									<div class="text-slate-400 text-[11px]">
+										Spending limit (minimum required)
+									</div>
+									<div class="text-slate-200 font-mono text-[11px]">
+										${token.clean(total)} ${token.symbol}
+									</div>
 								</div>
 							</div>
-							<br>
-							<div>
-								<div class="text-slate-400">Your user ID (principal)</div>
-								<div class="text-slate-200 font-mono break-all">
-									${this.wallet.principal}
-								</div>
-							</div>
-							<br>
-							<div>
-								<div class="text-slate-400">
-									Spending limit (must be at least)
-								</div>
-								<div class="text-slate-200 font-mono">
-									${token.clean(total)} ${token.symbol}
-								</div>
-							</div>
-						</div>
-	
-						<p class="mt-3 text-slate-400">
-							After you finish setting this up in AccountLink, return here and confirm this payment.
+						</details>
+		
+						<p class="text-slate-500 text-[11px]">
+							Make sure the spending limit in AccountLink is at least
+							<span class="font-mono">${token.clean(total)} ${token.symbol}</span>.
 						</p>
 					</section>
 				</div>
 			`,
 			[
 				{
-					label: `Confirm payment via AccountLink`,
+					// After the user has finished in AccountLink
+					label: `I’ve set this up in AccountLink – confirm payment`,
 					onClick: async () => {
 				this.busy = true;
 				this.render();
@@ -269,25 +307,27 @@ export default class Canvas {
 						this.notif.errorPopup(title, msg);
 					} else {
 						this.notif.successPopup(`Topup OK`, `Block: ${res.Ok}`);
-						this.get();
 					}
 				} catch (cause) {
 					this.busy = false;
 					this.notif.errorToast(`Topup Failed`, cause);
 				}
+				this.get();
 			}
 		}])
 	}
 
-	async commit(pixels) {
-		if (pixels.length == 0) {
+	async commit() {
+		if (this.wallet.principal == null) return this.notif.infoPopup('Every art has its own artist', 'Login to save your art')
+
+		if (this.placedPixels.size == 0) {
 			return this.notif.errorPopup('Nothing to save', 'Place at least one pixel before saving.');
 		}
 	
-		if (this.credits < pixels.length) {
+		if (this.credits < this.placedPixels.size) {
 			return this.notif.errorPopup(
 				'Not enough credits',
-				`You are trying to save ${pixels.length} pixels but you only have ${this.credits} credits. Please buy more credits.`
+				`You are trying to save ${this.placedPixels.size} pixels but you only have ${this.credits} credits. You need ${BigInt(this.placedPixels.size) - this.credits} credits more.`
 			);
 		}
 	
@@ -305,16 +345,14 @@ export default class Canvas {
 					<div>
 						<div class="text-slate-400">Pixels to save (credits to spend)</div>
 						<div class="text-slate-300 font-mono">
-							${pixels.length} pixels
+							${this.placedPixels.size} pixels
 						</div>
 					</div>
-	
 					<hr class="my-3 border-slate-700" />
-	
 					<div>
 						<div class="text-slate-400">Balance after save</div>
 						<div class="text-slate-300 font-mono">
-							${this.credits - BigInt(pixels.length)} credits
+							${this.credits - BigInt(this.placedPixels.size)} credits
 						</div>
 					</div>
 	
@@ -326,6 +364,19 @@ export default class Canvas {
 			[{
 				label: 'Confirm save',
 				onClick: async () => {
+					const pixels = [];
+					for (const [key, colorIdx] of this.placedPixels) {
+						const [x, y] = key.split(',').map(Number);
+						pixels.push({ 
+							x: BigInt(x), 
+							y: BigInt(y), 
+							color: BigInt(colorIdx),
+							subaccount: [],
+							memo: [],
+							created_at: [],
+						});
+					}
+					this.placedPixels.clear();
 					this.busy = true;
 					this.render();
 					try {
@@ -346,18 +397,19 @@ export default class Canvas {
 								});
 							} else oks += 1;
 						}
-						this.notif.successToast(`${oks} pixels saved`, 'If you have any feedback, feel free to tweet me (@kayicp)!');
-						for (const { x, y, err } of errs) {
+						this.notif.successToast(`${oks} pixels saved!`, 'Cool! (OwO)b');
+						for (const { x, y, color, err } of errs) {
 							let msg = JSON.stringify(err);
 							if ('GenericError' in err) msg = err.GenericError;
 							this.notif.errorToast(`Pixel (x: ${x}, y: ${y}) save failed`, msg);
+							this.placedPixels.set(`${x},${y}`, Number(color));
 						}
-						if (errs.length > 0) this.notif.infoToast(`${errs.length} Pixel Credits unused`);
-						this.get();
+						if (errs.length > 0) this.notif.infoToast(`${errs.length} pixels unsaved`);
 					} catch (cause) {
 						this.busy = false;
-						this.notif.errorPopup(`Save Failed`, `Cause: ${cause}. ${pixels.length} Pixel Credits unused.`);
+						this.notif.errorPopup(`Save Failed`, `Cause: ${cause}. ${pixels.length} pixels unsaved.`);
 					}
+					this.get();
 				}
 			}])
 		

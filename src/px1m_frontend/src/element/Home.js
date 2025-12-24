@@ -41,13 +41,13 @@ export default class Home {
     const { width, height, buffer } = this.canvasb;
     
     // 1. Fill background
-    this.ctx.fillStyle = colors[0].hex || '#000';
-    this.ctx.fillRect(0, 0, width, height);
+    // this.ctx.fillStyle = colors[0].hex || '#000';
+    // this.ctx.fillRect(0, 0, width, height);
 
     // 2. Draw buffer (saved/committed pixels)
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const colorIdx = buffer[y * width + x];
+        const colorIdx = buffer[y * width + x] ?? 0;
         this.ctx.fillStyle = colors[colorIdx].hex || '#000';
         this.ctx.fillRect(x, y, 1, 1);
       }

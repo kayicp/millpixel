@@ -135,7 +135,7 @@ export default class Topup {
 							<button
 								class="mt-auto w-full inline-flex justify-center items-center gap-2 px-4 py-2 rounded-lg font-semibold transition shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2
 									${idx === 0 ? 'focus:ring-violet-400' : idx === 1 ? 'focus:ring-amber-400' : 'focus:ring-emerald-400'}
-									${isLoggedIn
+									${isLoggedIn && !this.canvasb.busy
 										? `${idx === 0
 												? 'bg-violet-500 hover:bg-violet-600'
 												: idx === 1
@@ -144,12 +144,11 @@ export default class Topup {
 											} text-slate-900`
 										: 'bg-slate-700 text-slate-400 opacity-60 cursor-not-allowed pointer-events-none'
 									}"
-								?disabled=${!isLoggedIn}
+								?disabled=${!isLoggedIn || this.canvasb.busy}
 								@click=${(e) => {
 									e.preventDefault();
 									this.canvasb.topup(idx, p.price, p.credits);
-								}}
-							>
+								}}>
 								${isLoggedIn
 									? html`Get ${p.credits.toLocaleString()} credits`
 									: html`Log in to buy credits`

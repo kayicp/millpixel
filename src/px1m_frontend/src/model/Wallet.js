@@ -7,7 +7,8 @@ import { html } from "lit-html";
 const network = process.env.DFX_NETWORK;
 const identityProvider =
   network === 'ic'
-    ? 'https://identity.ic0.app' // Mainnet
+    // ? 'https://identity.ic0.app' // Mainnet
+		? 'https://id.ai/'
     : 'http://rdmx6-jaaaa-aaaaa-aaadq-cai.localhost:8080'; // Local
 
 const DAYS_30_NANOS = BigInt(30 * 24 * 60 * 60 * 1000 * 1000 * 1000);
@@ -24,6 +25,10 @@ class Wallet {
 		this.notif = notif;
 		this.#init();
   }
+
+	refresh() {
+		this.notif.pubsub.emit('refresh');
+	}
 
 	render(busy) {
 		this.busy = busy;
@@ -100,6 +105,7 @@ class Wallet {
 				this.principal = await identity.getPrincipal();
 				this.accountid = AccountIdentifier.fromPrincipal({ principal: this.principal }).toHex();
 				this.busy = false;
+				this.refresh();
 				resolve();
 			} catch (err) {
 				this.busy = false;
@@ -119,6 +125,7 @@ class Wallet {
 				this.accountid = null;
 				this.busy = false;
 				this.notif.successToast('Disconnected', `You are now Anonymous`);
+				this.refresh();
 				resolve();
 			} catch (cause) {
 				this.busy = false;

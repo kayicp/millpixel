@@ -30,6 +30,7 @@ const topup = new Topup(backend);
 const draw = new Draw(backend);
 const home = new Home(backend);
 
+pubsub.on('refresh', () => backend.get());
 pubsub.on('render', _render);
 window.addEventListener('popstate', _render);
 

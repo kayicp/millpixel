@@ -11,7 +11,6 @@ export default class Draw {
     this.wallet = backend.wallet;
     this.notif = backend.wallet.notif;
 
-    this.placedPixels = new Map();
     this.selectedColor = 1;
     this.isDrawing = false;
     this.pixelSize = 10;
@@ -69,7 +68,7 @@ export default class Draw {
   }
 
   setPixel(x, y) {
-    if (this.placedPixels.size >= Canvas.MAX_BATCH) return this.notif.infoPopup(`You've reached the limit of ${Canvas.MAX_BATCH} unsaved pixels`, 'Save now to apply your changes and continue drawing');
+    if (this.canvasb.placedPixels.size >= Canvas.MAX_BATCH) return this.notif.infoPopup(`You've reached the limit of ${Canvas.MAX_BATCH} unsaved pixels`, 'Save now to apply your changes and continue drawing');
 
     const { width, height } = this.canvasb;
     if (x < 0 || x >= width || y < 0 || y >= height) return;
@@ -77,10 +76,10 @@ export default class Draw {
     const key = `${x},${y}`;
     
     // Skip if same color already placed at this position
-    if (this.placedPixels.get(key) === this.selectedColor) return;
+    if (this.canvasb.placedPixels.get(key) === this.selectedColor) return;
     
     // Only track in placedPixels, don't update buffer until save
-    this.placedPixels.set(key, this.selectedColor);
+    this.canvasb.placedPixels.set(key, this.selectedColor);
     
     // Draw just this pixel (optimization - no full redraw)
     this.ctx.fillStyle = colors[this.selectedColor].hex || '#000';
@@ -112,20 +111,20 @@ export default class Draw {
     const { width, height, buffer } = this.canvasb;
     
     // 1. Fill background
-    this.ctx.fillStyle = colors[0].hex || '#000';
-    this.ctx.fillRect(0, 0, width * this.pixelSize, height * this.pixelSize);
+    // this.ctx.fillStyle = colors[0].hex || '#000';
+    // this.ctx.fillRect(0, 0, width * this.pixelSize, height * this.pixelSize);
     
     // 2. Draw buffer (saved/committed pixels)
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const colorIdx = buffer[y * width + x];
+        const colorIdx = buffer[y * width + x] ?? 0;
         this.ctx.fillStyle = colors[colorIdx].hex || '#000';
         this.ctx.fillRect(x * this.pixelSize, y * this.pixelSize, this.pixelSize, this.pixelSize);
       }
     }
     
     // 3. Draw placed pixels (pending/unsaved) on top
-    for (const [key, colorIdx] of this.placedPixels) {
+    for (const [key, colorIdx] of this.canvasb.placedPixels) {
       const [x, y] = key.split(',').map(Number);
       this.ctx.fillStyle = colors[colorIdx].hex || '#000';
       this.ctx.fillRect(x * this.pixelSize, y * this.pixelSize, this.pixelSize, this.pixelSize);
@@ -138,25 +137,9 @@ export default class Draw {
   }
 
   clearPlaced() {
-    this.placedPixels.clear();
+    this.canvasb.placedPixels.clear();
     this.redraw();
     this.wallet.render();
-  }
-
-  save() {
-    const pixels = [];
-    for (const [key, colorIdx] of this.placedPixels) {
-      const [x, y] = key.split(',').map(Number);
-      pixels.push({ 
-        x: BigInt(x), 
-        y: BigInt(y), 
-        color: BigInt(colorIdx),
-        subaccount: [],
-        memo: [],
-        created_at: [],
-      });
-    }
-    this.canvasb.commit(pixels);
   }
 
   render() {
@@ -166,7 +149,7 @@ export default class Draw {
     const { width, height } = this.canvasb;
     const displayWidth = width * this.pixelSize;
     const displayHeight = height * this.pixelSize;
-    const pixelCount = this.placedPixels.size;
+    const pixelCount = this.canvasb.placedPixels.size;
   
     setTimeout(() => {
       this.initCanvas();
@@ -202,17 +185,13 @@ export default class Draw {
             
             <button 
               class="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-md font-medium
-                ${pixelCount > 0 
-                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white' 
-                  : 'bg-slate-700 text-slate-400 cursor-not-allowed'}"
-              ?disabled=${pixelCount === 0}
-              @click=${() => this.save()}
+                ${pixelCount === 0 || this.canvasb.busy? 
+                  'bg-slate-700 text-slate-400 cursor-not-allowed'
+                  : 'bg-emerald-600 hover:bg-emerald-500 text-white'}"
+              ?disabled=${pixelCount === 0 || this.canvasb.busy}
+              @click=${() => this.canvasb.commit()}
             >
-              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                  d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/>
-              </svg>
-              Save
+              ${this.canvasb.busy? 'Saving...' : 'Save'}
             </button>
           </div>
         </div>
