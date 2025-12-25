@@ -68,7 +68,7 @@ export default class Canvas {
 				return this.notif.errorToast(`Canvas Credit Failed`, cause);
 			}
 		}
-
+		// todo: change copy to sell to different audience/early adopters
 		// if (this.has_init) {
 		try {
 			const PARALLEL = 5;

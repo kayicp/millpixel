@@ -29,6 +29,7 @@ import ICRC1L "../icrc1_canister/ICRC1";
 import ICRC1T "../icrc1_canister/Types";
 import ICRC1 "../icrc1_canister/main";
 import Linker1 "icrc1pv";
+import OptionX "../util/motoko/Option";
 
 shared (install) persistent actor class Canister(
   deploy : {
@@ -259,6 +260,33 @@ shared (install) persistent actor class Canister(
     switch find_dupe {
       case (?of) #Err(#Duplicate { of });
       case _ #Ok;
+    };
+  };
+
+  func syncTrim(now : Nat64) {
+    var round = 0;
+    let start_time = now - env.duration.tx_window - env.duration.permitted_drift;
+    label trimming while (round < env.max_update_batch_size) {
+      let (p, arg) = switch (RBTree.minKey(commit_dedupes)) {
+        case (?found) found;
+        case _ break trimming;
+      };
+      round += 1;
+      switch (OptionX.compare(arg.created_at, ?start_time, Nat64.compare)) {
+        case (#less) commit_dedupes := RBTree.delete(commit_dedupes, L.dedupeCommit, (p, arg));
+        case _ break trimming;
+      };
+    };
+    label trimming while (round < env.max_update_batch_size) {
+      let (p, arg) = switch (RBTree.minKey(topup_dedupes)) {
+        case (?found) found;
+        case _ break trimming;
+      };
+      round += 1;
+      switch (OptionX.compare(arg.created_at, ?start_time, Nat64.compare)) {
+        case (#less) topup_dedupes := RBTree.delete(topup_dedupes, L.dedupeTopup, (p, arg));
+        case _ break trimming;
+      };
     };
   };
 
